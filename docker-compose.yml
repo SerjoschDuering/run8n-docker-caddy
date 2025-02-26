@@ -24,6 +24,8 @@ services:
       - NODE_ENV=production
       - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=3
     volumes:
       - n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
