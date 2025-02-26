@@ -1,5 +1,5 @@
-n8n.<domain>.<suffix> {
+run8n.xyz {
     reverse_proxy n8n:5678 {
-      flush_interval -1
+        flush_interval -1
     }
 }
