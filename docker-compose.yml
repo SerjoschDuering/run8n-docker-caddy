@@ -12,7 +12,6 @@ services:
       - ${DATA_FOLDER}/caddy_config:/config
       - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
 
-services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     restart: always
