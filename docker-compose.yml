@@ -16,7 +16,7 @@ services:
     image: docker.n8n.io/n8nio/n8n
     restart: always
     ports:
-      - 5678:5678
+      - "5678:5678"
     environment:
       - N8N_HOST=${DOMAIN_NAME}
       - N8N_PORT=5678
@@ -28,6 +28,7 @@ services:
       - EXECUTIONS_DATA_MAX_AGE=3
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
+      - N8N_REDIS_PASSWORD=dummy_password
     volumes:
       - /mnt/volume_fra1_01/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
@@ -36,7 +37,8 @@ services:
     image: redis:alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--requirepass", "dummy_password"]
     volumes:
       - /mnt/volume_fra1_01/redis_data:/data
 
