@@ -26,10 +26,21 @@ services:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=3
+      # Redis settings for Bull queue, available for use in workflows
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
     volumes:
       - n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
-      
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - /mnt/volume_fra1_01/redis_data:/data
+
 volumes:
   caddy_data:
     external: true
