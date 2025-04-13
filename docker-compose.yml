@@ -36,6 +36,7 @@ services:
       - /mnt/volume_fra1_01/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
 
+
   redis:
     image: redis:alpine
     restart: unless-stopped
@@ -45,25 +46,7 @@ services:
     volumes:
       - /mnt/volume_fra1_01/redis_data:/data
 
-  nocodb:
-    image: nocodb/nocodb:latest
-    restart: always
-    expose:
-      - "8080"
-    volumes:
-      - /mnt/volume_fra1_01/nocodb_data:/usr/app/data
-    environment:
-      - NC_AUTH_BASIC_USER=admin
-      - NC_AUTH_BASIC_PASS=${NOCO_PASSWORD}  # set this variable in your .env file
-
-  qdrant:
-    image: qdrant/qdrant
-    restart: always
-    expose:
-      - "6333"
-    volumes:
-      - /mnt/volume_fra1_01/qdrant_storage:/qdrant/storage
-
 volumes:
   caddy_data:
     external: true
+ 
