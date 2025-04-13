@@ -3,3 +3,7 @@ run8n.xyz {
         flush_interval -1
     }
 }
+
+nocodb.run8n.xyz {
+    reverse_proxy nocodb:8080
+}
