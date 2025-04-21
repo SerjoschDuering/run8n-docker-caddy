@@ -1,0 +1,14 @@
+# Environment files
+.env
+.env-*
+
+# Caddy dynamic data (certificates, etc)
+caddy_data/
+
+# Local data directories
+**/data/
+**/storage/
+
+# OS files
+.DS_Store
+Thumbs.db 
