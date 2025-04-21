@@ -7,3 +7,9 @@ run8n.xyz {
 nocodb.run8n.xyz {
     reverse_proxy nocodb:8080
 }
+
+siyuan.run8n.xyz {
+    reverse_proxy siyuan:6806 {
+        websocket
+    }
+}

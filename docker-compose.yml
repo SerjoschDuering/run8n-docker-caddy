@@ -64,6 +64,21 @@ services:
     volumes:
       - /mnt/volume_fra1_01/qdrant_storage:/qdrant/storage
 
+  siyuan:
+    image: b3log/siyuan
+    restart: unless-stopped
+    expose:
+      - "6806"
+    command: 
+      - "--workspace=/siyuan/workspace/"
+      - "--accessAuthCode=${SIYUAN_AUTH_CODE}"
+    volumes:
+      - /mnt/volume_fra1_01/siyuan_data:/siyuan/workspace
+    environment:
+      - TZ=${GENERIC_TIMEZONE}
+      - PUID=1000
+      - PGID=1000
+
 volumes:
   caddy_data:
     external: true
