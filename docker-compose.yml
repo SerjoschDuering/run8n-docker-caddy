@@ -32,6 +32,7 @@ services:
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
       - N8N_REDIS_PASSWORD=dummy_password
+      - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
     volumes:
       - /mnt/volume_fra1_01/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
