@@ -10,6 +10,5 @@ nocodb.run8n.xyz {
 
 siyuan.run8n.xyz {
     reverse_proxy siyuan:6806 {
-        websocket
     }
 }
