@@ -233,7 +233,8 @@ services:
   # ===========================================
 
   windmill_db:
-    image: postgres:15.1-alpine
+    image: postgres:16
+    shm_size: 256m  # Reduced for 4GB VPS
     restart: unless-stopped
     ports:
       - "127.0.0.1:5434:5432"  # Localhost only
@@ -244,7 +245,7 @@ services:
     volumes:
       - /mnt/volume_fra1_01/windmill_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d windmill"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -257,18 +258,16 @@ services:
       - windmill_internal
 
   windmill_server:
-    image: ghcr.io/windmill-labs/windmill:latest  # Latest stable version
-    pull_policy: always  # Always pull latest
+    image: ghcr.io/windmill-labs/windmill:latest
+    pull_policy: always
     restart: unless-stopped
     expose:
-      - "8000"  # Not exposed externally - only via Caddy
+      - "8000"
     environment:
-      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill?sslmode=disable
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
       - MODE=server
-      - RUST_LOG=info
       - BASE_URL=https://windmill.${DOMAIN_NAME}
-      - WEBHOOK_BASE_URL=https://windmill.${DOMAIN_NAME}
-      # S3 storage for artifacts
+      # S3 storage configuration
       - S3_BUCKET=${DO_SPACES_BUCKET}
       - AWS_ACCESS_KEY_ID=${DO_SPACES_KEY}
       - AWS_SECRET_ACCESS_KEY=${DO_SPACES_SECRET}
@@ -277,49 +276,80 @@ services:
     depends_on:
       windmill_db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    volumes:
+      - /mnt/volume_fra1_01/windmill/logs:/tmp/windmill/logs
     deploy:
       resources:
         limits:
-          memory: 384M  # Increased for server performance
+          memory: 384M
           cpus: '0.4'
     networks:
       - windmill_internal
       - public
 
-  # Native worker only - no Docker socket for security
-  windmill_worker_native:
-    image: ghcr.io/windmill-labs/windmill:latest  # Latest stable version
-    pull_policy: always  # Always pull latest
+  # Standard worker with Docker support
+  windmill_worker:
+    image: ghcr.io/windmill-labs/windmill:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill?sslmode=disable
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
       - MODE=worker
-      - WORKER_GROUP=native
-      - DISABLE_NSJAIL=true
-      - DISABLE_NUSER=true
-      - NUM_WORKERS=1  # Number of worker threads
-      # S3 storage for job artifacts
-      - S3_BUCKET=${DO_SPACES_BUCKET}
-      - AWS_ACCESS_KEY_ID=${DO_SPACES_KEY}
-      - AWS_SECRET_ACCESS_KEY=${DO_SPACES_SECRET}
-      - S3_ENDPOINT=https://${DO_SPACES_REGION}.digitaloceanspaces.com
-      - S3_REGION=${DO_SPACES_REGION}
-    # No Docker socket volume - security improvement
-    volumes:
-      - /mnt/volume_fra1_01/windmill/worker_cache:/tmp/windmill
+      - WORKER_GROUP=default
     depends_on:
       windmill_db:
         condition: service_healthy
+    volumes:
+      # Uncomment to enable Docker support from workers
+      # - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/volume_fra1_01/windmill/cache:/tmp/windmill/cache
+      - /mnt/volume_fra1_01/windmill/logs:/tmp/windmill/logs
     deploy:
       resources:
         limits:
-          memory: 512M  # Much more for worker performance
-          cpus: '0.5'
+          memory: 384M  # Reduced for 4GB VPS
+          cpus: '0.4'
+    networks:
+      - windmill_internal
+
+  # Native worker for lightweight jobs
+  windmill_worker_native:
+    image: ghcr.io/windmill-labs/windmill:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NUM_WORKERS=4  # Multiple lightweight workers
+      - SLEEP_QUEUE=200  # Less frequent polling for native jobs
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    volumes:
+      - /mnt/volume_fra1_01/windmill/logs:/tmp/windmill/logs
+    deploy:
+      resources:
+        limits:
+          memory: 256M  # Less memory for native workers
+          cpus: '0.3'
+    networks:
+      - windmill_internal
+
+  # Language server for IDE features
+  windmill_lsp:
+    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    pull_policy: always
+    restart: unless-stopped
+    expose:
+      - "3001"
+    volumes:
+      - /mnt/volume_fra1_01/windmill/lsp_cache:/pyls/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
     networks:
       - windmill_internal
 
