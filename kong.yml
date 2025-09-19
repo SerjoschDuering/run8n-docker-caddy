@@ -1,0 +1,80 @@
+_format_version: "2.1"
+
+services:
+  # Auth Service
+  - name: auth-v1-open
+    url: http://supabase_auth:9999
+    routes:
+      - name: auth-v1-open
+        strip_path: true
+        paths:
+          - /auth/v1
+
+  # REST Service
+  - name: rest-v1
+    url: http://supabase_rest:3000
+    routes:
+      - name: rest-v1-all
+        strip_path: false
+        paths:
+          - /rest/v1
+
+  # Storage Service (if enabled)
+  - name: storage-v1
+    url: http://supabase_storage:5000
+    routes:
+      - name: storage-v1-all
+        strip_path: false
+        paths:
+          - /storage/v1
+
+consumers:
+  - username: anon
+    keyauth_credentials:
+      - key: ${SUPABASE_ANON_KEY}
+
+  - username: service_role
+    keyauth_credentials:
+      - key: ${SUPABASE_SERVICE_ROLE_KEY}
+
+###
+### Plugins for All Services
+###
+plugins:
+  - name: cors
+    config:
+      origins:
+        - https://supabase.${DOMAIN_NAME}
+        - http://localhost:3000
+      credentials: true
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - X-Auth-Token
+        - apikey
+      exposed_headers:
+        - X-Auth-Token
+        - Content-Range
+        - Content-Encoding
+        - Content-Length
+      max_age: 3600
+
+  - name: key-auth
+    config:
+      key_names:
+        - apikey
+      key_in_header: true
+      key_in_query: true
+      hide_credentials: true
+
+  - name: acl
+    config:
+      hide_groups_header: true
+      allow:
+        - anon
+        - authenticated
+        - service_role

@@ -11,15 +11,17 @@ services:
       - caddy_data:/data
       - ${DATA_FOLDER}/caddy_config:/config
       - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
+    networks:
+      - public
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:next
     restart: always
-    ports:
-      - "5678:5678"
+    expose:
+      - "5678"
     env_file:
-      - .env        # your existing env file
-      - .env-n8n-ai # new secrets file
+      - .env
+      - .env-n8n-ai
     environment:
       - N8N_HOST=${DOMAIN_NAME}
       - N8N_PORT=5678
@@ -27,25 +29,298 @@ services:
       - NODE_ENV=production
       - WEBHOOK_URL=https://${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - EXECUTIONS_MODE=queue
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=24
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
-      - N8N_REDIS_PASSWORD=dummy_password
+      - QUEUE_BULL_REDIS_PASSWORD=dummy_password
       - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
     volumes:
       - /mnt/volume_fra1_01/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
+    deploy:
+      resources:
+        limits:
+          memory: 768M  # Adequate for queue mode with workers
+          cpus: '0.6'
+    networks:
+      - internal
+      - public
 
   redis:
     image: redis:alpine
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
     command: ["redis-server", "--requirepass", "dummy_password"]
     volumes:
       - /mnt/volume_fra1_01/redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M  # Sufficient for queue operations
+          cpus: '0.2'
+    networks:
+      - internal
 
+  # ===========================================
+  # MINIMAL SUPABASE FOR 4GB SYSTEM
+  # ===========================================
+
+  supabase_db:
+    image: postgres:15.1-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5433:5432"  # Localhost only
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: ${SUPABASE_POSTGRES_PASSWORD}
+    volumes:
+      - /mnt/volume_fra1_01/supabase_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supabase_admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384M  # Increased for better performance
+          cpus: '0.4'
+    networks:
+      - supabase_internal
+
+  supabase_kong:
+    image: kong:2.8.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8000"  # Localhost only - security fix
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - ./kong.yml:/var/lib/kong/kong.tmpl.yml:ro
+    command: [
+      "sh", "-lc",
+      "sed -e 's~\\\\$\\\\{SUPABASE_ANON_KEY\\\\}~${SUPABASE_ANON_KEY}~g' -e 's~\\\\$\\\\{SUPABASE_SERVICE_ROLE_KEY\\\\}~${SUPABASE_SERVICE_ROLE_KEY}~g' /var/lib/kong/kong.tmpl.yml > /var/lib/kong/kong.yml && kong docker-start"
+    ]
+    depends_on:
+      supabase_auth:
+        condition: service_healthy
+      supabase_rest:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 192M  # Increased for better throughput
+          cpus: '0.3'
+    networks:
+      - supabase_internal
+      - public
+
+  supabase_auth:
+    image: supabase/gotrue:v2.143.0  # Pinned version
+    restart: unless-stopped
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: https://supabase.${DOMAIN_NAME}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_admin:${SUPABASE_POSTGRES_PASSWORD}@supabase_db:5432/postgres?search_path=auth
+      GOTRUE_SITE_URL: https://supabase.${DOMAIN_NAME}
+      GOTRUE_URI_ALLOW_LIST: "https://supabase.${DOMAIN_NAME}"  # Security: restrict URIs
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP:-true}
+      GOTRUE_MAILER_AUTOCONFIRM: false
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+    depends_on:
+      supabase_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M  # Increased for stability
+          cpus: '0.2'
+    networks:
+      - supabase_internal
+
+  supabase_rest:
+    image: postgrest/postgrest:v12.0.1  # Pinned version
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://supabase_admin:${SUPABASE_POSTGRES_PASSWORD}@supabase_db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+    depends_on:
+      supabase_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M  # Increased for stability
+          cpus: '0.2'
+    networks:
+      - supabase_internal
+
+  # Optional: Storage API (can be disabled if not needed)
+  supabase_storage:
+    image: supabase/storage-api:v0.46.4  # Pinned version
+    restart: unless-stopped
+    profiles: ["with-storage"]  # Only starts if you use --profile with-storage
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://supabase_rest:3000
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      DATABASE_URL: postgres://supabase_admin:${SUPABASE_POSTGRES_PASSWORD}@supabase_db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: ${DO_SPACES_BUCKET}
+      REGION: ${DO_SPACES_REGION}
+      AWS_ACCESS_KEY_ID: ${DO_SPACES_KEY}
+      AWS_SECRET_ACCESS_KEY: ${DO_SPACES_SECRET}
+      S3_ENDPOINT: https://${DO_SPACES_REGION}.digitaloceanspaces.com
+      PUBLIC_URL: ${DO_SPACES_CDN_ENDPOINT}
+      ENABLE_IMAGE_TRANSFORMATION: "false"  # Save resources
+    depends_on:
+      supabase_db:
+        condition: service_healthy
+      supabase_rest:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/status"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 192M  # Increased if you enable storage
+          cpus: '0.3'
+    networks:
+      - supabase_internal
+
+  # ===========================================
+  # MINIMAL WINDMILL FOR 4GB SYSTEM
+  # ===========================================
+
+  windmill_db:
+    image: postgres:15.1-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"  # Localhost only
+    environment:
+      POSTGRES_DB: windmill
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${WINDMILL_DB_PASSWORD}
+    volumes:
+      - /mnt/volume_fra1_01/windmill_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d windmill"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384M  # Increased for better performance
+          cpus: '0.4'
+    networks:
+      - windmill_internal
+
+  windmill_server:
+    image: ghcr.io/windmill-labs/windmill:v1.385.0  # Pinned version
+    restart: unless-stopped
+    expose:
+      - "8000"  # Not exposed externally - only via Caddy
+    environment:
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill?sslmode=disable
+      - MODE=server
+      - RUST_LOG=info
+      - BASE_URL=https://windmill.${DOMAIN_NAME}
+      - WEBHOOK_BASE_URL=https://windmill.${DOMAIN_NAME}
+      # S3 storage for artifacts
+      - S3_BUCKET=${DO_SPACES_BUCKET}
+      - AWS_ACCESS_KEY_ID=${DO_SPACES_KEY}
+      - AWS_SECRET_ACCESS_KEY=${DO_SPACES_SECRET}
+      - S3_ENDPOINT=https://${DO_SPACES_REGION}.digitaloceanspaces.com
+      - S3_REGION=${DO_SPACES_REGION}
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 384M  # Increased for server performance
+          cpus: '0.4'
+    networks:
+      - windmill_internal
+      - public
+
+  # Native worker only - no Docker socket for security
+  windmill_worker_native:
+    image: ghcr.io/windmill-labs/windmill:v1.385.0  # Pinned version
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill?sslmode=disable
+      - MODE=worker
+      - WORKER_GROUP=native
+      - DISABLE_NSJAIL=true
+      - DISABLE_NUSER=true
+      # S3 storage for job artifacts
+      - S3_BUCKET=${DO_SPACES_BUCKET}
+      - AWS_ACCESS_KEY_ID=${DO_SPACES_KEY}
+      - AWS_SECRET_ACCESS_KEY=${DO_SPACES_SECRET}
+      - S3_ENDPOINT=https://${DO_SPACES_REGION}.digitaloceanspaces.com
+      - S3_REGION=${DO_SPACES_REGION}
+    # No Docker socket volume - security improvement
+    volumes:
+      - /mnt/volume_fra1_01/windmill/worker_cache:/tmp/windmill
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Much more for worker performance
+          cpus: '0.5'
+    networks:
+      - windmill_internal
+
+  # Keep existing services unchanged
   nocodb:
     image: nocodb/nocodb:latest
     restart: always
@@ -55,7 +330,15 @@ services:
       - /mnt/volume_fra1_01/nocodb_data:/usr/app/data
     environment:
       - NC_AUTH_BASIC_USER=admin
-      - NC_AUTH_BASIC_PASS=${NOCO_PASSWORD}  # set this variable in your .env file
+      - NC_AUTH_BASIC_PASS=${NOCO_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 256M  # Reasonable for light usage
+          cpus: '0.3'
+    networks:
+      - internal
+      - public
 
   qdrant:
     image: qdrant/qdrant
@@ -64,13 +347,20 @@ services:
       - "6333"
     volumes:
       - /mnt/volume_fra1_01/qdrant_storage:/qdrant/storage
+    deploy:
+      resources:
+        limits:
+          memory: 256M  # Minimum for vector operations
+          cpus: '0.3'
+    networks:
+      - internal
 
   siyuan:
     image: b3log/siyuan
     restart: unless-stopped
     expose:
       - "6806"
-    command: 
+    command:
       - "--workspace=/siyuan/workspace/"
       - "--accessAuthCode=${SIYUAN_AUTH_CODE}"
     volumes:
@@ -79,6 +369,24 @@ services:
       - TZ=${GENERIC_TIMEZONE}
       - PUID=1000
       - PGID=1000
+    deploy:
+      resources:
+        limits:
+          memory: 256M  # Light note-taking usage
+          cpus: '0.2'
+    networks:
+      - internal
+      - public
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    internal: true
+  supabase_internal:
+    internal: true
+  windmill_internal:
+    internal: true
 
 volumes:
   caddy_data:
