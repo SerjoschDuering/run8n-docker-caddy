@@ -1,6 +1,7 @@
 # Environment files
 .env
 .env-*
+.env.real-example
 
 # Caddy dynamic data (certificates, etc)
 caddy_data/
@@ -8,6 +9,11 @@ caddy_data/
 # Local data directories
 **/data/
 **/storage/
+
+# Documentation and research files
+*-research.md
+integration-plan.md
+supabase-backend-integration.md
 
 # OS files
 .DS_Store
