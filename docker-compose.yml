@@ -257,7 +257,8 @@ services:
       - windmill_internal
 
   windmill_server:
-    image: ghcr.io/windmill-labs/windmill:v1.385.0  # Pinned version
+    image: ghcr.io/windmill-labs/windmill:latest  # Latest stable version
+    pull_policy: always  # Always pull latest
     restart: unless-stopped
     expose:
       - "8000"  # Not exposed externally - only via Caddy
@@ -292,7 +293,8 @@ services:
 
   # Native worker only - no Docker socket for security
   windmill_worker_native:
-    image: ghcr.io/windmill-labs/windmill:v1.385.0  # Pinned version
+    image: ghcr.io/windmill-labs/windmill:latest  # Latest stable version
+    pull_policy: always  # Always pull latest
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill?sslmode=disable
@@ -300,6 +302,7 @@ services:
       - WORKER_GROUP=native
       - DISABLE_NSJAIL=true
       - DISABLE_NUSER=true
+      - NUM_WORKERS=1  # Number of worker threads
       # S3 storage for job artifacts
       - S3_BUCKET=${DO_SPACES_BUCKET}
       - AWS_ACCESS_KEY_ID=${DO_SPACES_KEY}
