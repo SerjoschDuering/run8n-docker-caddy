@@ -264,7 +264,7 @@ services:
 
   windmill_server:
     image: ghcr.io/windmill-labs/windmill:latest
-    pull_policy: always
+    pull_policy: if_not_present
     restart: unless-stopped
     expose:
       - "8000"
@@ -295,7 +295,7 @@ services:
   # Standard worker with Docker support
   windmill_worker:
     image: ghcr.io/windmill-labs/windmill:latest
-    pull_policy: always
+    pull_policy: if_not_present
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
@@ -324,7 +324,7 @@ services:
   # Native worker for lightweight jobs
   windmill_worker_native:
     image: ghcr.io/windmill-labs/windmill:latest
-    pull_policy: always
+    pull_policy: if_not_present
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
@@ -352,7 +352,7 @@ services:
   # Language server for IDE features
   windmill_lsp:
     image: ghcr.io/windmill-labs/windmill-lsp:latest
-    pull_policy: always
+    pull_policy: if_not_present
     restart: unless-stopped
     expose:
       - "3001"
