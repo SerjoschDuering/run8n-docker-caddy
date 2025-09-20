@@ -162,6 +162,9 @@ services:
           cpus: '0.2'
     networks:
       - supabase_internal
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   supabase_rest:
     image: postgrest/postgrest:v12.0.1  # Pinned version
@@ -227,6 +230,9 @@ services:
           cpus: '0.3'
     networks:
       - supabase_internal
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   # ===========================================
   # MINIMAL WINDMILL FOR 4GB SYSTEM
@@ -311,6 +317,9 @@ services:
           cpus: '0.4'
     networks:
       - windmill_internal
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   # Native worker for lightweight jobs
   windmill_worker_native:
@@ -335,6 +344,9 @@ services:
           cpus: '0.3'
     networks:
       - windmill_internal
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   # Language server for IDE features
   windmill_lsp:
