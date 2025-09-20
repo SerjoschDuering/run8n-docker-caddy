@@ -29,12 +29,9 @@ services:
       - NODE_ENV=production
       - WEBHOOK_URL=https://${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
-      - EXECUTIONS_MODE=queue
+      - EXECUTIONS_MODE=regular
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=24
-      - QUEUE_BULL_REDIS_HOST=redis
-      - QUEUE_BULL_REDIS_PORT=6379
-      - QUEUE_BULL_REDIS_PASSWORD=dummy_password
       - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
     volumes:
       - /mnt/volume_fra1_01/n8n_data:/home/node/.n8n
@@ -42,7 +39,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M  # Adequate for queue mode with workers
+          memory: 768M 
           cpus: '0.6'
     networks:
       - internal
