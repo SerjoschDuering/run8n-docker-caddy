@@ -174,7 +174,7 @@ services:
     expose:
       - "8000"
     environment:
-      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - DATABASE_URL=postgresql://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
       - MODE=server
       - BASE_URL=https://windmill.${DOMAIN_NAME}
       # Hetzner Object Storage (if available) or alternative S3
@@ -206,7 +206,7 @@ services:
     pull_policy: if_not_present
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - DATABASE_URL=postgresql://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
       - MODE=worker
       - WORKER_GROUP=default
       - KEEP_JOB_DIR=false
@@ -238,7 +238,7 @@ services:
     pull_policy: if_not_present
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - DATABASE_URL=postgresql://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
       - MODE=worker
       - WORKER_GROUP=native
       - NUM_WORKERS=8  # More workers with available CPUs
