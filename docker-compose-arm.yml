@@ -1,0 +1,453 @@
+version: "3.7"
+
+# ===========================================
+# ARM-OPTIMIZED DOCKER COMPOSE FOR HETZNER ARM
+# 16 vCPUs, 32GB RAM, 320GB Storage
+# ===========================================
+#
+# RESOURCE ALLOCATION SUMMARY:
+# - n8n: 4GB RAM, 2 CPU
+# - Redis: 1GB RAM, 0.5 CPU
+# - Windmill DB: 1GB RAM, 1 CPU
+# - Windmill Server: 1GB RAM, 1 CPU
+# - Windmill Workers: 4x 1GB RAM, 4x 1 CPU (4GB total)
+# - Windmill Native: 1GB RAM, 1 CPU
+# - Windmill LSP: 512MB RAM, 0.5 CPU
+# - Supabase DB: 1GB RAM, 1 CPU (when enabled)
+# - NocoDB: 1GB RAM, 0.5 CPU
+# - Qdrant: 2GB RAM, 1 CPU
+# - SiYuan: 768MB RAM, 0.5 CPU
+# - Caddy: 512MB RAM, 0.5 CPU
+# - Prometheus: 512MB RAM, 0.5 CPU (optional)
+# - Grafana: 512MB RAM, 0.5 CPU (optional)
+#
+# TOTAL ACTIVE: ~16GB RAM, ~13 CPUs
+# REMAINING: ~16GB RAM for system/burst/future services
+# ===========================================
+
+services:
+  caddy:
+    image: caddy:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - ${DATA_FOLDER}/caddy_config:/config
+      - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - public
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    platform: linux/arm64
+    restart: always
+    expose:
+      - "5678"
+    env_file:
+      - .env
+      - .env-n8n-ai
+    environment:
+      - N8N_HOST=${DOMAIN_NAME}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${DOMAIN_NAME}/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - EXECUTIONS_MODE=regular
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168  # Keep for 7 days with more storage
+      - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
+      # Performance optimizations for ARM
+      - N8N_METRICS=true
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+    volumes:
+      - /data/n8n_data:/home/node/.n8n
+      - ${DATA_FOLDER}/local_files:/files
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Realistic for production workflows
+          cpus: '2.0'
+    networks:
+      - internal
+      - public
+
+  redis:
+    image: redis:alpine
+    platform: linux/arm64
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-changeme}", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - /data/redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G  # Sufficient for caching
+          cpus: '0.5'
+    networks:
+      - internal
+
+  # ===========================================
+  # SUPABASE SUITE - Enable when needed
+  # ===========================================
+
+  supabase_db:
+    image: postgres:16-alpine  # Using newer version for ARM optimization
+    platform: linux/arm64
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: ${SUPABASE_POSTGRES_PASSWORD}
+      # Performance tuning for 32GB RAM
+      POSTGRES_MAX_CONNECTIONS: 200
+      POSTGRES_SHARED_BUFFERS: 2GB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 8GB
+      POSTGRES_MAINTENANCE_WORK_MEM: 512MB
+      POSTGRES_WORK_MEM: 16MB
+    volumes:
+      - /data/supabase_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supabase_admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Generous for database
+          cpus: '2.0'
+    networks:
+      - supabase_internal
+
+  # ===========================================
+  # WINDMILL - Workflow Engine
+  # ===========================================
+
+  windmill_db:
+    image: postgres:16-alpine
+    platform: linux/arm64
+    shm_size: 1g  # Increased for 32GB system
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_DB: windmill
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${WINDMILL_DB_PASSWORD}
+      # Performance tuning
+      POSTGRES_MAX_CONNECTIONS: 100
+      POSTGRES_SHARED_BUFFERS: 1GB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 4GB
+    volumes:
+      - /data/windmill_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+    networks:
+      - windmill_internal
+
+  windmill_server:
+    image: ghcr.io/windmill-labs/windmill:latest
+    platform: linux/arm64
+    pull_policy: if_not_present
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - MODE=server
+      - BASE_URL=https://windmill.${DOMAIN_NAME}
+      # Hetzner Object Storage (if available) or alternative S3
+      - S3_BUCKET=${S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${S3_KEY}
+      - AWS_SECRET_ACCESS_KEY=${S3_SECRET}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION}
+      # Performance settings for ARM
+      - TIMEOUT=600  # 10 minutes for long-running jobs
+      - QUEUE_LIMIT_WAIT_RESULT=120
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    volumes:
+      - /data/windmill/logs:/tmp/windmill/logs
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+    networks:
+      - windmill_internal
+      - public
+
+  windmill_worker:
+    image: ghcr.io/windmill-labs/windmill:latest
+    platform: linux/arm64
+    pull_policy: if_not_present
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - MODE=worker
+      - WORKER_GROUP=default
+      - KEEP_JOB_DIR=false
+      - WORKER_TAGS=arm64,heavy
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    volumes:
+      # Enable Docker support if needed
+      # - /var/run/docker.sock:/var/run/docker.sock
+      - /data/windmill/cache:/tmp/windmill/cache
+      - /data/windmill/logs:/tmp/windmill/logs
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # More memory for complex workflows
+          cpus: '2.0'
+      replicas: 2  # Multiple workers for parallelism
+    networks:
+      - windmill_internal
+      - public
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  windmill_worker_native:
+    image: ghcr.io/windmill-labs/windmill:latest
+    platform: linux/arm64
+    pull_policy: if_not_present
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://postgres:${WINDMILL_DB_PASSWORD}@windmill_db:5432/windmill
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NUM_WORKERS=8  # More workers with available CPUs
+      - SLEEP_QUEUE=100
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    volumes:
+      - /data/windmill/logs:/tmp/windmill/logs
+    deploy:
+      resources:
+        limits:
+          memory: 1G  # Native workers are lightweight
+          cpus: '1.0'
+    networks:
+      - windmill_internal
+      - public
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  windmill_lsp:
+    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    platform: linux/arm64
+    pull_policy: if_not_present
+    restart: unless-stopped
+    expose:
+      - "3001"
+    volumes:
+      - /data/windmill/lsp_cache:/pyls/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - windmill_internal
+
+  # ===========================================
+  # NOCODB - Database UI (ARM workaround)
+  # ===========================================
+
+  # Option 1: Try official image (may work on newer versions)
+  nocodb:
+    image: nocodb/nocodb:latest
+    platform: linux/arm64
+    restart: always
+    expose:
+      - "8080"
+    volumes:
+      - /data/nocodb_data:/usr/app/data
+    environment:
+      - NC_AUTH_BASIC_USER=admin
+      - NC_AUTH_BASIC_PASS=${NOCO_PASSWORD}
+      - NC_DB_JSON_FILE_PATH=/usr/app/data/
+      - NC_REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+    deploy:
+      resources:
+        limits:
+          memory: 1G  # Sufficient for NocoDB
+          cpus: '0.5'
+    networks:
+      - internal
+      - public
+
+  # Option 2 (if above fails): Run native binary in Alpine container
+  # nocodb-native:
+  #   image: alpine:latest
+  #   platform: linux/arm64
+  #   restart: always
+  #   expose:
+  #     - "8080"
+  #   volumes:
+  #     - /data/nocodb_data:/usr/app/data
+  #     - ./nocodb-arm64:/usr/local/bin/nocodb:ro
+  #   command: ["/usr/local/bin/nocodb"]
+  #   environment:
+  #     - NC_AUTH_BASIC_USER=admin
+  #     - NC_AUTH_BASIC_PASS=${NOCO_PASSWORD}
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1G
+  #         cpus: '0.5'
+  #   networks:
+  #     - internal
+  #     - public
+
+  # ===========================================
+  # QDRANT - Vector Database (ARM optimized)
+  # ===========================================
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    platform: linux/arm64
+    restart: always
+    expose:
+      - "6333"
+      - "6334"  # gRPC port
+    volumes:
+      - /data/qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
+      # Performance tuning for ARM
+      - QDRANT__STORAGE__WAL__WAL_CAPACITY_MB=256
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=8
+      - QDRANT__STORAGE__PERFORMANCE__MAX_OPTIMIZATION_THREADS=4
+    deploy:
+      resources:
+        limits:
+          memory: 2G  # Good for vector operations
+          cpus: '1.0'
+    networks:
+      - internal
+
+  # ===========================================
+  # SIYUAN - Note Taking (ARM native)
+  # ===========================================
+
+  siyuan:
+    image: b3log/siyuan:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "6806"
+    command:
+      - "--workspace=/siyuan/workspace/"
+      - "--accessAuthCode=${SIYUAN_AUTH_CODE}"
+    volumes:
+      - /data/siyuan_data:/siyuan/workspace
+    environment:
+      - TZ=${GENERIC_TIMEZONE}
+      - PUID=1000
+      - PGID=1000
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          memory: 768M  # Sufficient for note-taking
+          cpus: '0.5'
+    networks:
+      - internal
+      - public
+
+  # ===========================================
+  # OPTIONAL: Additional Services
+  # ===========================================
+
+  # Monitoring with Prometheus (ARM compatible)
+  prometheus:
+    image: prom/prometheus:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "9090"
+    volumes:
+      - /data/prometheus:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Prometheus is lightweight
+          cpus: '0.5'
+    networks:
+      - internal
+
+  # Grafana for visualization (ARM compatible)
+  grafana:
+    image: grafana/grafana:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "3000"
+    volumes:
+      - /data/grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=redis-datasource
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Grafana UI is lightweight
+          cpus: '0.5'
+    networks:
+      - internal
+      - public
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    internal: true
+  supabase_internal:
+    internal: true
+  windmill_internal:
+    internal: true
+
+volumes:
+  caddy_data:
+    driver: local

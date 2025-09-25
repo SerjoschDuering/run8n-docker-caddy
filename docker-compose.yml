@@ -103,7 +103,7 @@ services:
   #     - ./kong.yml:/var/lib/kong/kong.tmpl.yml:ro
   #   command: [
   #     "sh", "-lc",
-  #     "sed -e 's~\\\\$\\\\{SUPABASE_ANON_KEY\\\\}~${SUPABASE_ANON_KEY}~g' -e 's~\\\\$\\\\{SUPABASE_SERVICE_ROLE_KEY\\\\}~${SUPABASE_SERVICE_ROLE_KEY}~g' /var/lib/kong/kong.tmpl.yml > /var/lib/kong/kong.yml && kong docker-start"
+  #     "sed -e 's~\\${SUPABASE_ANON_KEY}~${SUPABASE_ANON_KEY}~g' -e 's~\\${SUPABASE_SERVICE_ROLE_KEY}~${SUPABASE_SERVICE_ROLE_KEY}~g' /var/lib/kong/kong.tmpl.yml > /var/lib/kong/kong.yml && kong docker-start"
   #   ]
   #   depends_on:
   #     supabase_auth:
