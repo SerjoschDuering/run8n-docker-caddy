@@ -15,7 +15,9 @@ services:
       - public
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:next
+    build:
+      context: .
+      dockerfile: Dockerfile.n8n
     restart: always
     expose:
       - "5678"
@@ -33,6 +35,9 @@ services:
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=24
       - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
+      # Enable external modules for Code nodes
+      - NODE_FUNCTION_ALLOW_EXTERNAL=moment,lodash,axios,cheerio,xlsx,csv-parser,uuid,crypto-js,handlebars,moment-timezone,sharp,jimp,pdf-lib,puppeteer-core,js-yaml,joi,jsonwebtoken,bcrypt,node-html-parser,fast-xml-parser
+      # Keep task runners internal (default) for stability
     volumes:
       - /mnt/volume_fra1_01/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files

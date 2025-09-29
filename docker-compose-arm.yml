@@ -6,17 +6,17 @@ version: "3.7"
 # ===========================================
 #
 # RESOURCE ALLOCATION SUMMARY:
-# - n8n: 4GB RAM, 2 CPU
-# - Redis: 1GB RAM, 0.5 CPU
+# - n8n: 6GB RAM, 2 CPU
+# - Redis: 0.5GB RAM, 0.5 CPU
 # - Windmill DB: 1GB RAM, 1 CPU
 # - Windmill Server: 1GB RAM, 1 CPU
 # - Windmill Workers: 4x 1GB RAM, 4x 1 CPU (4GB total)
 # - Windmill Native: 1GB RAM, 1 CPU
 # - Windmill LSP: 512MB RAM, 0.5 CPU
 # - Supabase DB: 1GB RAM, 1 CPU (when enabled)
-# - NocoDB: 1GB RAM, 0.5 CPU
+# - NocoDB: 1GB RAM, 1 CPU
 # - Qdrant: 2GB RAM, 1 CPU
-# - SiYuan: 768MB RAM, 0.5 CPU
+# - SiYuan: 1GB RAM, 1 CPU
 # - Caddy: 512MB RAM, 0.5 CPU
 # - Prometheus: 512MB RAM, 0.5 CPU (optional)
 # - Grafana: 512MB RAM, 0.5 CPU (optional)
@@ -71,12 +71,12 @@ services:
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
       - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
     volumes:
-      - /data/n8n_data:/home/node/.n8n
+      - /opt/run8n_data/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
     deploy:
       resources:
         limits:
-          memory: 4G  # Realistic for production workflows
+          memory: 6G  # Realistic for production workflows
           cpus: '2.0'
     networks:
       - internal
@@ -88,7 +88,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-changeme}", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
-      - /data/redis_data:/data
+      - /opt/run8n_data/redis_data:/data
     deploy:
       resources:
         limits:
@@ -118,7 +118,7 @@ services:
       POSTGRES_MAINTENANCE_WORK_MEM: 512MB
       POSTGRES_WORK_MEM: 16MB
     volumes:
-      - /data/supabase_postgres:/var/lib/postgresql/data
+      - /opt/run8n_data/supabase_postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U supabase_admin -d postgres"]
       interval: 10s
@@ -128,7 +128,7 @@ services:
       resources:
         limits:
           memory: 4G  # Generous for database
-          cpus: '2.0'
+          cpus: '1.0'
     networks:
       - supabase_internal
 
@@ -152,7 +152,7 @@ services:
       POSTGRES_SHARED_BUFFERS: 1GB
       POSTGRES_EFFECTIVE_CACHE_SIZE: 4GB
     volumes:
-      - /data/windmill_postgres:/var/lib/postgresql/data
+      - /opt/run8n_data/windmill_postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -190,15 +190,18 @@ services:
       windmill_db:
         condition: service_healthy
     volumes:
-      - /data/windmill/logs:/tmp/windmill/logs
+      - /opt/run8n_data/windmill/logs:/tmp/windmill/logs
     deploy:
       resources:
         limits:
           memory: 2G
           cpus: '1.5'
+    dns:
+      - 185.12.64.1
+      - 185.12.64.2
     networks:
-      - windmill_internal
       - public
+      - windmill_internal
 
   windmill_worker:
     image: ghcr.io/windmill-labs/windmill:latest
@@ -217,20 +220,19 @@ services:
     volumes:
       # Enable Docker support if needed
       # - /var/run/docker.sock:/var/run/docker.sock
-      - /data/windmill/cache:/tmp/windmill/cache
-      - /data/windmill/logs:/tmp/windmill/logs
+      - /opt/run8n_data/windmill/cache:/tmp/windmill/cache
+      - /opt/run8n_data/windmill/logs:/tmp/windmill/logs
     deploy:
       resources:
         limits:
-          memory: 4G  # More memory for complex workflows
-          cpus: '2.0'
-      replicas: 2  # Multiple workers for parallelism
+          memory: 1G  # Standard worker memory
+          cpus: '1.0'
     networks:
-      - windmill_internal
       - public
+      - windmill_internal
     dns:
-      - 8.8.8.8
-      - 1.1.1.1
+      - 185.12.64.1
+      - 185.12.64.2
 
   windmill_worker_native:
     image: ghcr.io/windmill-labs/windmill:latest
@@ -247,18 +249,18 @@ services:
       windmill_db:
         condition: service_healthy
     volumes:
-      - /data/windmill/logs:/tmp/windmill/logs
+      - /opt/run8n_data/windmill/logs:/tmp/windmill/logs
     deploy:
       resources:
         limits:
           memory: 1G  # Native workers are lightweight
           cpus: '1.0'
     networks:
-      - windmill_internal
       - public
+      - windmill_internal
     dns:
-      - 8.8.8.8
-      - 1.1.1.1
+      - 185.12.64.1
+      - 185.12.64.2
 
   windmill_lsp:
     image: ghcr.io/windmill-labs/windmill-lsp:latest
@@ -268,7 +270,7 @@ services:
     expose:
       - "3001"
     volumes:
-      - /data/windmill/lsp_cache:/pyls/.cache
+      - /opt/run8n_data/windmill/lsp_cache:/pyls/.cache
     deploy:
       resources:
         limits:
@@ -289,17 +291,17 @@ services:
     expose:
       - "8080"
     volumes:
-      - /data/nocodb_data:/usr/app/data
+      - /opt/run8n_data/nocodb_data:/usr/app/data
     environment:
       - NC_AUTH_BASIC_USER=admin
       - NC_AUTH_BASIC_PASS=${NOCO_PASSWORD}
-      - NC_DB_JSON_FILE_PATH=/usr/app/data/
+      - NC_DB_JSON_FILE_PATH=/usr/app/opt/run8n_data/
       - NC_REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
     deploy:
       resources:
         limits:
           memory: 1G  # Sufficient for NocoDB
-          cpus: '0.5'
+          cpus: '1'
     networks:
       - internal
       - public
@@ -339,7 +341,7 @@ services:
       - "6333"
       - "6334"  # gRPC port
     volumes:
-      - /data/qdrant_storage:/qdrant/storage
+      - /opt/run8n_data/qdrant_storage:/qdrant/storage
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
@@ -370,7 +372,7 @@ services:
       - "--workspace=/siyuan/workspace/"
       - "--accessAuthCode=${SIYUAN_AUTH_CODE}"
     volumes:
-      - /data/siyuan_data:/siyuan/workspace
+      - /opt/run8n_data/siyuan_data:/siyuan/workspace
     environment:
       - TZ=${GENERIC_TIMEZONE}
       - PUID=1000
@@ -382,8 +384,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M  # Sufficient for note-taking
-          cpus: '0.5'
+          memory: 1G  # Sufficient for note-taking
+          cpus: '1'
     networks:
       - internal
       - public
@@ -400,7 +402,7 @@ services:
     expose:
       - "9090"
     volumes:
-      - /data/prometheus:/prometheus
+      - /opt/run8n_data/prometheus:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -424,7 +426,7 @@ services:
     expose:
       - "3000"
     volumes:
-      - /data/grafana:/var/lib/grafana
+      - /opt/run8n_data/grafana:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}

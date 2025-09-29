@@ -1,0 +1,46 @@
+FROM docker.n8n.io/n8nio/n8n:next
+
+# Switch to root to install packages
+USER root
+
+# Install minimal system dependencies + ffmpeg
+RUN apk add --no-cache python3 py3-pip ffmpeg
+
+# Install essential Python packages (lightweight)
+RUN pip3 install --no-cache-dir \
+    requests \
+    pandas \
+    numpy \
+    beautifulsoup4 \
+    lxml \
+    openpyxl \
+    pillow \
+    python-dateutil \
+    pytz \
+    qrcode \
+    markdown \
+    pyyaml \
+    jsonschema
+
+# Install essential Node.js packages
+RUN npm install -g \
+    moment \
+    lodash \
+    axios \
+    cheerio \
+    xlsx \
+    csv-parser \
+    uuid \
+    crypto-js \
+    handlebars \
+    moment-timezone \
+    sharp \
+    pdf-lib \
+    js-yaml \
+    joi \
+    jsonwebtoken \
+    node-html-parser \
+    fast-xml-parser
+
+# Switch back to node user
+USER node
