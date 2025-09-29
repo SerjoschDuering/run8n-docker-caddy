@@ -21,29 +21,18 @@ windmill.run8n.xyz {
     reverse_proxy windmill_server:8000
 }
 
-# CapRover PaaS - Forms subdomain
-forms.run8n.xyz {
-    reverse_proxy caprover:8080 {
-        header_up Host forms.run8n.xyz
-        header_up X-Forwarded-Proto https
-        header_up X-Real-IP {remote_host}
-    }
+# Static sites - single repository serving
+sites.run8n.xyz {
+    root * /srv
+    file_server browse
 }
 
-# CapRover PaaS - Sites subdomain with wildcard support
-sites.run8n.xyz, *.sites.run8n.xyz {
-    reverse_proxy caprover:8080 {
-        header_up Host {host}
-        header_up X-Forwarded-Proto https
-        header_up X-Real-IP {remote_host}
+# Project subdomains (site1.sites.run8n.xyz → /srv/site1/)
+*.sites.run8n.xyz {
+    map {host} {project} {
+        ~^([^.]+)\.sites\.run8n\.xyz$ $1
     }
+    root * /srv/{project}
+    file_server
 }
 
-# CapRover Dashboard
-caprover.run8n.xyz {
-    reverse_proxy caprover:3000 {
-        header_up Host caprover.run8n.xyz
-        header_up X-Forwarded-Proto https
-        header_up X-Real-IP {remote_host}
-    }
-}

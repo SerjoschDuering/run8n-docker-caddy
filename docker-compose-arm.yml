@@ -18,11 +18,10 @@ version: "3.7"
 # - Qdrant: 2GB RAM, 1 CPU
 # - SiYuan: 1GB RAM, 1 CPU
 # - Caddy: 512MB RAM, 0.5 CPU
-# - CapRover: 1GB RAM, 1 CPU (PaaS for static sites)
 # - Prometheus: 512MB RAM, 0.5 CPU (optional)
 # - Grafana: 512MB RAM, 0.5 CPU (optional)
 #
-# TOTAL ACTIVE: ~17GB RAM, ~14 CPUs
+# TOTAL ACTIVE: ~16GB RAM, ~13 CPUs
 # REMAINING: ~16GB RAM for system/burst/future services
 # ===========================================
 
@@ -38,6 +37,7 @@ services:
       - caddy_data:/data
       - ${DATA_FOLDER}/caddy_config:/config
       - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
+      - /opt/run8n_data/static_sites:/srv
     deploy:
       resources:
         limits:
@@ -391,36 +391,6 @@ services:
       - internal
       - public
 
-  # ===========================================
-  # CAPROVER - PaaS for Static Sites
-  # ===========================================
-
-  caprover:
-    image: caprover/caprover:latest
-    platform: linux/arm64
-    restart: unless-stopped
-    ports:
-      - "3000:3000"   # CapRover dashboard
-      - "8080:80"     # HTTP for apps (proxied via Caddy)
-      - "8443:443"    # HTTPS for apps (proxied via Caddy)
-      - "996:996"     # CapRover registry (optional)
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /opt/run8n_data/caprover:/captain
-    environment:
-      - ACCEPTED_TERMS=true
-      - CAPTAIN_ROOT_DOMAIN=forms.run8n.xyz
-      - DEFAULT_PASSWORD=${CAPROVER_PASSWORD:-captain123}
-      # Skip domain verification since we're behind Caddy
-      - CAPTAIN_IS_DEBUG=false
-    deploy:
-      resources:
-        limits:
-          memory: 1G  # PaaS management overhead
-          cpus: '1.0'
-    networks:
-      - public
-      - internal
 
   # ===========================================
   # OPTIONAL: Additional Services
