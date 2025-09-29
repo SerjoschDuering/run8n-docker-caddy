@@ -846,6 +846,315 @@ For maximum compatibility, consider running CapRover on a separate server:
 
 This approach eliminates all integration complexity while providing full CapRover functionality.
 
+## Step-by-Step Hetzner Cloud Setup Guide
+
+### Phase 1: Hetzner Cloud Server Setup
+
+**1. Create Hetzner Cloud Server:**
+```bash
+# Via Hetzner Console or API
+- Server Type: CX21 (2 vCPU, 4GB RAM) or higher
+- Image: Ubuntu 22.04 LTS
+- Location: Choose closest to your users
+- Networking: Enable public IPv4
+- SSH Keys: Add your public key
+- Firewalls: Create new or use default
+```
+
+**2. Configure Hetzner Cloud Firewall:**
+```bash
+# Via Hetzner Console -> Firewalls -> Create Firewall
+Name: caprover-firewall
+Rules:
+  Inbound:
+    - SSH: Port 22, Source: Your IP/32
+    - HTTP: Port 80, Source: 0.0.0.0/0, ::/0
+    - HTTPS: Port 443, Source: 0.0.0.0/0, ::/0
+    - CapRover: Port 3000, Source: Your IP/32
+  Outbound:
+    - All Traffic: Allow all
+```
+
+**3. Initial Server Configuration:**
+```bash
+# SSH into server
+ssh root@YOUR_HETZNER_IP
+
+# Update system
+apt update && apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Configure firewall (server-level)
+ufw allow ssh
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 3000/tcp
+ufw --force enable
+
+# Harden SSH
+sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+systemctl restart sshd
+```
+
+### Phase 2: DNS Configuration
+
+**1. Configure DNS Records:**
+```bash
+# Add these A records to your DNS provider
+# (Replace YOUR_HETZNER_IP with actual server IP)
+
+forms.run8n.xyz      A    YOUR_HETZNER_IP
+*.forms.run8n.xyz    A    YOUR_HETZNER_IP
+sites.run8n.xyz      A    YOUR_HETZNER_IP
+*.sites.run8n.xyz    A    YOUR_HETZNER_IP
+```
+
+**2. Verify DNS Propagation:**
+```bash
+# Test from local machine
+nslookup forms.run8n.xyz
+nslookup test.forms.run8n.xyz
+nslookup sites.run8n.xyz
+nslookup app.sites.run8n.xyz
+
+# Should all return YOUR_HETZNER_IP
+```
+
+### Phase 3: CapRover Installation
+
+**1. Install CapRover:**
+```bash
+# On Hetzner server
+docker run -p 80:80 -p 443:443 -p 3000:3000 \
+  -e ACCEPTED_TERMS=true \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /captain:/captain \
+  --name caprover-captain \
+  --restart=unless-stopped \
+  caprover/caprover
+
+# Wait for installation to complete (2-3 minutes)
+docker logs caprover-captain -f
+```
+
+**2. Initial CapRover Setup:**
+```bash
+# Visit http://YOUR_HETZNER_IP:3000
+# Default password: captain42
+
+# In CapRover dashboard:
+# 1. Change password immediately
+# 2. Settings -> CapRover Root Domain: forms.run8n.xyz (or sites.run8n.xyz)
+# 3. Enable HTTPS -> Enter email -> Enable HTTPS
+# 4. Force HTTPS (recommended)
+```
+
+**3. Configure for Caddy Integration:**
+```bash
+# On Hetzner server - disable domain verification
+echo '{"skipVerifyingDomains":"true"}' > /captain/data/config-override.json
+docker service update captain-captain --force
+
+# Verify configuration
+cat /captain/data/config-override.json
+```
+
+### Phase 4: Caddy Integration (Main Server)
+
+**1. Update Main Server Caddyfile:**
+```caddyfile
+# Add to your existing Caddyfile on main server
+*.run8n.xyz {
+    # CapRover subdomain delegation
+    @forms host forms.run8n.xyz, *.forms.run8n.xyz
+    handle @forms {
+        reverse_proxy YOUR_HETZNER_IP:80 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    @sites host sites.run8n.xyz, *.sites.run8n.xyz
+    handle @sites {
+        reverse_proxy YOUR_HETZNER_IP:80 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Your existing routes continue unchanged
+    @n8n host run8n.xyz
+    handle @n8n {
+        reverse_proxy n8n:5678
+    }
+    # ... other existing routes
+}
+
+# Optional: CapRover dashboard access
+captain.run8n.xyz {
+    reverse_proxy YOUR_HETZNER_IP:3000
+}
+```
+
+**2. Reload Caddy Configuration:**
+```bash
+# On main server
+docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+### Phase 5: Testing and Verification
+
+**1. Test CapRover Access:**
+```bash
+# Test direct access (should work)
+curl -I http://YOUR_HETZNER_IP:3000
+
+# Test via Caddy proxy (should work)
+curl -I https://forms.run8n.xyz
+curl -I https://sites.run8n.xyz
+```
+
+**2. Deploy Test Application:**
+```bash
+# In CapRover dashboard:
+# Apps -> Create New App
+# App Name: hello-world
+# Deploy Method: Deploy via ImageName
+# Image Name: nginx:latest
+# Enable HTTPS
+# Custom Domain: hello.forms.run8n.xyz
+
+# Test deployment
+curl -I https://hello.forms.run8n.xyz
+```
+
+### Phase 6: Security Hardening
+
+**1. Secure SSH Access:**
+```bash
+# Create non-root user
+adduser deploy
+usermod -aG docker deploy
+usermod -aG sudo deploy
+
+# Add SSH key for new user
+mkdir /home/deploy/.ssh
+cp /root/.ssh/authorized_keys /home/deploy/.ssh/
+chown -R deploy:deploy /home/deploy/.ssh
+
+# Disable root login
+sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
+systemctl restart sshd
+```
+
+**2. Install Security Tools:**
+```bash
+# Install fail2ban
+apt install fail2ban -y
+
+# Configure fail2ban for SSH
+cat > /etc/fail2ban/jail.local << 'EOF'
+[sshd]
+enabled = true
+port = 22
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+findtime = 600
+bantime = 3600
+EOF
+
+systemctl enable fail2ban
+systemctl start fail2ban
+```
+
+**3. Setup Automated Backups:**
+```bash
+# Create backup script
+cat > /home/deploy/backup-caprover.sh << 'EOF'
+#!/bin/bash
+DATE=$(date +%Y%m%d-%H%M%S)
+BACKUP_DIR="/tmp/caprover-backups"
+mkdir -p $BACKUP_DIR
+
+# Backup captain data
+tar -czf $BACKUP_DIR/captain-$DATE.tar.gz /captain
+
+# Backup any databases (if running PostgreSQL in CapRover)
+if docker ps | grep -q postgres; then
+    docker exec $(docker ps -q -f name=postgres) pg_dumpall -U postgres > $BACKUP_DIR/postgres-$DATE.sql
+fi
+
+# Upload to Backblaze (configure B2 CLI first)
+# b2 upload-file your-bucket $BACKUP_DIR/captain-$DATE.tar.gz
+# b2 upload-file your-bucket $BACKUP_DIR/postgres-$DATE.sql
+
+# Cleanup old backups (keep 7 days)
+find $BACKUP_DIR -type f -mtime +7 -delete
+EOF
+
+chmod +x /home/deploy/backup-caprover.sh
+
+# Add to crontab (daily backup at 2 AM)
+echo "0 2 * * * /home/deploy/backup-caprover.sh" | crontab -
+```
+
+### Phase 7: Monitoring Setup
+
+**1. Enable NetData (Optional):**
+```bash
+# In CapRover dashboard:
+# Apps -> One-Click Apps/Databases -> NetData
+# Deploy with default settings
+# Access via: https://netdata.forms.run8n.xyz
+```
+
+**2. Setup Log Monitoring:**
+```bash
+# View CapRover logs
+docker service logs captain-captain -f
+
+# View application logs
+docker service logs srv-captain--your-app-name -f
+```
+
+### Troubleshooting Common Issues
+
+**1. SSL Certificate Issues:**
+```bash
+# Check Let's Encrypt logs
+docker exec captain-captain cat /captain/logs/captain.log | grep -i ssl
+
+# Manually request certificate
+docker exec captain-captain ./pro-captain request-certificate --domain forms.run8n.xyz
+```
+
+**2. DNS Resolution Problems:**
+```bash
+# Test from CapRover server
+nslookup forms.run8n.xyz
+dig forms.run8n.xyz
+
+# Check CapRover DNS settings
+docker exec captain-captain cat /captain/data/config-captain.json | grep -i domain
+```
+
+**3. Proxy Issues:**
+```bash
+# Check nginx configuration
+docker exec captain-captain cat /captain/data/nginx/server-blocks/conf.d/captain-root-domain-name.conf
+
+# Test direct connection
+curl -H "Host: forms.run8n.xyz" http://YOUR_HETZNER_IP
+```
+
 ---
 
 **Last Updated**: 2024-09-29
