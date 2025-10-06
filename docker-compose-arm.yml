@@ -453,7 +453,7 @@ services:
     platform: linux/arm64
     restart: unless-stopped
     expose:
-      - "7575"
+      - "3000"
     volumes:
       - /opt/run8n_data/homarr/appdata:/appdata
     environment:

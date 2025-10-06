@@ -95,7 +95,7 @@ dashboard.run8n.xyz {
 
     # Main Dashboard - Homarr (root)
     handle {
-        reverse_proxy homarr:7575
+        reverse_proxy homarr:3000
     }
 }
 
