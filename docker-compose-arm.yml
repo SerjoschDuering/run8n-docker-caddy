@@ -45,6 +45,7 @@ services:
           cpus: '0.5'
     networks:
       - public
+      - dashboard_internal
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:next
@@ -420,7 +421,7 @@ services:
           memory: 1G
           cpus: '0.5'
     networks:
-      - public
+      - dashboard_internal
 
   netdata:
     image: netdata/netdata:latest
@@ -448,7 +449,7 @@ services:
           memory: 200M
           cpus: '0.3'
     networks:
-      - public
+      - dashboard_internal
 
   dozzle:
     image: amir20/dozzle:latest
@@ -470,7 +471,7 @@ services:
           memory: 64M
           cpus: '0.1'
     networks:
-      - public
+      - dashboard_internal
 
   filebrowser:
     image: filebrowser/filebrowser:latest
@@ -488,7 +489,7 @@ services:
           memory: 64M
           cpus: '0.1'
     networks:
-      - public
+      - dashboard_internal
 
 networks:
   public:
@@ -498,6 +499,8 @@ networks:
   supabase_internal:
     internal: true
   windmill_internal:
+    internal: true
+  dashboard_internal:
     internal: true
 
 volumes:
