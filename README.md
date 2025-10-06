@@ -20,6 +20,12 @@ A production-ready Docker Compose setup for running multiple self-hosted service
 ### Knowledge Management
 - **SiYuan**: Privacy-first, self-hosted note-taking and knowledge management (Notion alternative)
 
+### AI & Development
+- **MCP Servers**: Model Context Protocol servers with automated GitHub Actions deployment
+  - Path-based routing: `mcp.run8n.xyz/{name}`
+  - Zero-touch deployment from GitHub
+  - See [MCP-DEPLOYMENT.md](./MCP-DEPLOYMENT.md) for details
+
 ## 🏗️ Architecture
 
 - **Storage**: All persistent data on Digital Ocean Volume (`/mnt/volume_fra1_01/`)
@@ -49,6 +55,7 @@ After deployment, access your services at:
 - **Windmill**: https://windmill.yourdomain.com
 - **NocoDB**: https://nocodb.yourdomain.com
 - **SiYuan**: https://siyuan.yourdomain.com
+- **MCP Servers**: https://mcp.yourdomain.com/{server-name}
 
 ## 🚀 Quick Start
 
@@ -82,6 +89,7 @@ After deployment, access your services at:
 ## 📚 Documentation
 
 - [Secrets Setup Guide](./secrets-setup-guide.md) - Detailed guide for all environment variables
+- [MCP Deployment Guide](./MCP-DEPLOYMENT.md) - **Deploy MCP servers via GitHub Actions**
 - [Supabase Research](./supabase-research.md) - Supabase configuration details
 - [Windmill Research](./windmill-research.md) - Windmill configuration details
 - [Integration Plan](./integration-plan.md) - Architecture and resource planning

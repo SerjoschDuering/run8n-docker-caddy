@@ -54,3 +54,21 @@ sites.run8n.xyz {
     file_server
 }
 
+# MCP Servers - Dynamic path-based routing
+# Any container named {name}-mcp is auto-routed: mcp.run8n.xyz/name → {name}-mcp:3000
+mcp.run8n.xyz {
+    # Extract MCP name from path: /siyuan/foo → siyuan
+    @mcp_path path_regexp ^/([^/]+)(/.*)?$
+
+    # Route to corresponding container: /siyuan → siyuan-mcp:3000
+    reverse_proxy @mcp_path {
+        to {re.mcp_path.1}-mcp:3000
+        header_up Host {host}
+    }
+
+    # Root path info
+    handle / {
+        respond "MCP Gateway - Add path for specific server (e.g., /siyuan)" 200
+    }
+}
+

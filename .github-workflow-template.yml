@@ -1,0 +1,81 @@
+name: Deploy MCP Server to Hetzner
+
+# Copy this file to .github/workflows/deploy.yml in your MCP server repo
+# Set the following secrets in your GitHub repo:
+#   - HETZNER_SSH_KEY: SSH private key for Hetzner server
+#   - HETZNER_HOST: Hetzner server IP or hostname
+#   - HETZNER_USER: SSH username (usually 'root')
+#
+# Customize the env variables below for your MCP server
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  # CUSTOMIZE THESE FOR YOUR MCP SERVER
+  MCP_NAME: siyuan                                    # Name used in URL: mcp.run8n.xyz/{MCP_NAME}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}                # e.g., ghcr.io/username/repo-name
+  DOCKER_CONTEXT: .                                   # Directory containing Dockerfile
+  DOCKERFILE: Dockerfile                              # Dockerfile name
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Log in to GitHub Container Registry
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 3: Extract metadata for Docker
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix={{branch}}-
+
+      # Step 4: Build and push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.DOCKER_CONTEXT }}
+          file: ${{ env.DOCKERFILE }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # Step 5: Deploy to Hetzner
+      - name: Deploy to Hetzner via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            # Pull latest image and deploy
+            /mnt/volume_fra1_01/run8n-docker-caddy/deploy-mcp.sh \
+              ${{ env.MCP_NAME }} \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      # Step 6: Notify success
+      - name: Deployment complete
+        run: |
+          echo "✅ MCP Server deployed successfully!"
+          echo "🌐 Available at: https://mcp.run8n.xyz/${{ env.MCP_NAME }}"

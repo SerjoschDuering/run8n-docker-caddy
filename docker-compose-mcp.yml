@@ -1,0 +1,53 @@
+version: "3.7"
+
+# MCP (Model Context Protocol) Servers
+# Each MCP server is deployed via GitHub Actions
+# Images are pulled from GitHub Container Registry (GHCR)
+
+services:
+  # SiYuan MCP Server
+  siyuan-mcp:
+    image: ghcr.io/onigeya/siyuan-mcp-server:latest
+    restart: unless-stopped
+    container_name: siyuan-mcp
+    expose:
+      - "3000"
+    environment:
+      - PORT=3000
+      - SIYUAN_API_URL=http://siyuan:6806
+      - NODE_ENV=production
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.3'
+    networks:
+      - mcp_network
+      - public
+
+  # Add more MCP servers here
+  # Example template:
+  #
+  # notion-mcp:
+  #   image: ghcr.io/yourusername/notion-mcp-server:latest
+  #   restart: unless-stopped
+  #   container_name: notion-mcp
+  #   expose:
+  #     - "3000"
+  #   environment:
+  #     - PORT=3000
+  #     - NODE_ENV=production
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #         cpus: '0.3'
+  #   networks:
+  #     - mcp_network
+  #     - public
+
+networks:
+  mcp_network:
+    driver: bridge
+  public:
+    external: true
