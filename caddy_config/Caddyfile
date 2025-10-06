@@ -85,19 +85,16 @@ dashboard.run8n.xyz {
 
     # Server Monitoring - Netdata
     handle /monitor* {
-        uri strip_prefix /monitor
         reverse_proxy netdata:19999
     }
 
     # Container Logs - Dozzle
     handle /logs* {
-        uri strip_prefix /logs
         reverse_proxy dozzle:8080
     }
 
     # File Browser
     handle /files* {
-        uri strip_prefix /files
         reverse_proxy filebrowser:80
     }
 

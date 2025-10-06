@@ -460,6 +460,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
+      - DOZZLE_BASE=/logs
       - DOZZLE_LEVEL=info
       - DOZZLE_TAILSIZE=300
       - DOZZLE_FILTER=status=running
@@ -476,12 +477,14 @@ services:
     image: filebrowser/filebrowser:latest
     platform: linux/arm64
     restart: unless-stopped
-    command: --noauth --baseurl /files
+    command: --noauth
     expose:
       - "80"
     volumes:
       - /opt/run8n_data:/srv
       - /opt/run8n_data/filebrowser:/config
+    environment:
+      - FB_BASEURL=/files
     deploy:
       resources:
         limits:
