@@ -71,31 +71,13 @@ mcp.run8n.xyz {
 }
 
 # ===========================================
-# DASHBOARD STACK - Single Domain Path-Based Routing
+# DASHBOARD STACK - Homarr Auth Gateway
 # ===========================================
 
+# ONLY Homarr is publicly accessible - it's the auth gateway
+# Netdata, Dozzle, Filebrowser are NOT publicly exposed
+# Access them ONLY through Homarr after login
 dashboard.run8n.xyz {
-    # Server Monitoring - Netdata
-    handle /monitor* {
-        uri strip_prefix /monitor
-        reverse_proxy netdata:19999
-    }
-
-    # Container Logs - Dozzle
-    handle /logs* {
-        uri strip_prefix /logs
-        reverse_proxy dozzle:8080
-    }
-
-    # File Browser
-    handle /files* {
-        uri strip_prefix /files
-        reverse_proxy filebrowser:80
-    }
-
-    # Main Dashboard - Homarr (root)
-    handle {
-        reverse_proxy homarr:3000
-    }
+    reverse_proxy homarr:3000
 }
 
