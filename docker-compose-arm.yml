@@ -449,18 +449,17 @@ services:
   # ===========================================
 
   homarr:
-    image: ghcr.io/ajnart/homarr:latest
+    image: ghcr.io/homarr-labs/homarr:latest
     platform: linux/arm64
     restart: unless-stopped
     expose:
       - "7575"
     volumes:
-      - /opt/run8n_data/homarr/configs:/app/data/configs
-      - /opt/run8n_data/homarr/icons:/app/public/icons
-      - /opt/run8n_data/homarr/data:/data
+      - /opt/run8n_data/homarr/appdata:/appdata
     environment:
       - AUTH_PROVIDER=credentials
-      - AUTH_SECRET_KEY=${HOMARR_SECRET_KEY}
+      - SECRET_ENCRYPTION_KEY=${HOMARR_SECRET_KEY}
+      - BASE_URL=https://dashboard.run8n.xyz
     deploy:
       resources:
         limits:
