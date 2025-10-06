@@ -90,7 +90,7 @@ ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/hetzner_deploy
 
 ### 5. Add Service to docker-compose-mcp.yml
 
-On Hetzner server, edit `/mnt/volume_fra1_01/run8n-docker-caddy/docker-compose-mcp.yml`:
+On Hetzner server, edit `/home/joo/run8n/docker-compose-mcp.yml`:
 
 ```yaml
   myserver-mcp:
@@ -130,10 +130,10 @@ GitHub Actions will:
 
 ## 📁 File Structure
 
-### Hetzner Server (`/mnt/volume_fra1_01/run8n-docker-caddy/`)
+### Hetzner Server (`/home/joo/run8n/`)
 
 ```
-run8n-docker-caddy/
+run8n/
 ├── caddy_config/
 │   └── Caddyfile                    # Dynamic routing config
 ├── docker-compose.yml               # Main services
@@ -167,7 +167,7 @@ ssh root@run8n.xyz  # or your server IP
 ### Check Running MCP Servers
 
 ```bash
-cd /mnt/volume_fra1_01/run8n-docker-caddy
+cd /home/joo/run8n
 docker-compose -f docker-compose-mcp.yml ps
 ```
 
@@ -195,9 +195,9 @@ docker-compose -f docker-compose-mcp.yml restart
 docker-compose -f docker-compose-mcp.yml stop siyuan-mcp
 ```
 
-## 🌐 Caddy Dynamic Routing
+## 🌐 Caddy Path-Based Routing
 
-Caddy automatically routes paths to containers using this pattern:
+Caddy routes paths to containers following this pattern:
 
 ```
 URL: mcp.run8n.xyz/{name}
@@ -210,9 +210,54 @@ Container: {name}-mcp:3000
 - `mcp.run8n.xyz/notion` → `notion-mcp:3000`
 - `mcp.run8n.xyz/s3` → `s3-mcp:3000`
 
-**No manual Caddy configuration needed!** Just follow the naming convention: `{name}-mcp`
+**Adding a new MCP server route:**
+
+Edit `/home/joo/run8n/caddy_config/Caddyfile` and add:
+
+```
+handle /myserver* {
+    reverse_proxy myserver-mcp:3000
+}
+```
+
+Then reload Caddy:
+```bash
+docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+**Naming convention:** Container must be named `{name}-mcp` where `{name}` matches the URL path.
 
 ## 🔒 Security
+
+### SSH Key Setup (Recommended: Dedicated User)
+
+For better security, use a dedicated deployment user instead of root:
+
+**On Hetzner server:**
+```bash
+# Create dedicated user for GitHub Actions
+sudo adduser --disabled-password github-deploy
+sudo usermod -aG docker github-deploy
+
+# Setup SSH key
+sudo mkdir -p /home/github-deploy/.ssh
+sudo nano /home/github-deploy/.ssh/authorized_keys
+# Paste your public key, then save
+
+# Set permissions
+sudo chown -R github-deploy:github-deploy /home/github-deploy/.ssh
+sudo chmod 700 /home/github-deploy/.ssh
+sudo chmod 600 /home/github-deploy/.ssh/authorized_keys
+```
+
+**Restrict what the key can do:**
+```bash
+# Edit authorized_keys and prefix the key with:
+command="/home/joo/run8n/deploy-mcp.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA...
+```
+
+**Then update GitHub secrets:**
+- `HETZNER_USER` → `github-deploy` (instead of `root`)
 
 ### Token Security Model
 

@@ -23,7 +23,7 @@ services:
           cpus: '0.3'
     networks:
       - mcp_network
-      - public
+      - run8n_public
 
   # Add more MCP servers here
   # Example template:
@@ -44,10 +44,10 @@ services:
   #         cpus: '0.3'
   #   networks:
   #     - mcp_network
-  #     - public
+  #     - run8n_public
 
 networks:
   mcp_network:
     driver: bridge
-  public:
+  run8n_public:
     external: true

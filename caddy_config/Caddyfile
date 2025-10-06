@@ -45,30 +45,28 @@ sites.run8n.xyz {
     file_server browse
 }
 
-# Project subdomains (site1.sites.run8n.xyz → /srv/site1/)
-*.sites.run8n.xyz {
-    map {host} {project} {
-        ~^([^.]+)\.sites\.run8n\.xyz$ $1
-    }
-    root * /srv/{project}
-    file_server
-}
-
-# MCP Servers - Dynamic path-based routing
-# Any container named {name}-mcp is auto-routed: mcp.run8n.xyz/name → {name}-mcp:3000
+# MCP Servers - Path-based routing
+# Pattern: mcp.run8n.xyz/{name} → {name}-mcp:3000
 mcp.run8n.xyz {
-    # Extract MCP name from path: /siyuan/foo → siyuan
-    @mcp_path path_regexp ^/([^/]+)(/.*)?$
-
-    # Route to corresponding container: /siyuan → siyuan-mcp:3000
-    reverse_proxy @mcp_path {
-        to {re.mcp_path.1}-mcp:3000
-        header_up Host {host}
+    # SiYuan MCP Server
+    handle /siyuan* {
+        reverse_proxy siyuan-mcp:3000
     }
 
-    # Root path info
+    # Add more MCP servers here as you deploy them
+    # Example:
+    # handle /notion* {
+    #     reverse_proxy notion-mcp:3000
+    # }
+
+    # Root path - info page
     handle / {
-        respond "MCP Gateway - Add path for specific server (e.g., /siyuan)" 200
+        respond "MCP Gateway - Available servers: /siyuan" 200
+    }
+
+    # 404 for unknown paths
+    handle {
+        respond "MCP Server not found" 404
     }
 }
 

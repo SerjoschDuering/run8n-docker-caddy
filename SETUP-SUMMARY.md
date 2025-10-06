@@ -21,17 +21,32 @@ SSH into your Hetzner server and run:
 
 ```bash
 # 1. Copy files to server
-cd /mnt/volume_fra1_01/run8n-docker-caddy
+cd /home/joo/run8n
 
 # 2. Make deployment script executable
 chmod +x deploy-mcp.sh
 
 # 3. Create MCP network
-docker network create mcp_network || true
+docker network create mcp_network 2>/dev/null || echo "Network already exists"
 
-# 4. Reload Caddy with new config
+# 4. Start MCP services
+docker-compose -f docker-compose-mcp.yml up -d
+
+# 5. Reload Caddy with new config
 docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+# 6. Verify
+docker ps | grep mcp
+docker network ls | grep run8n_public
 ```
+
+**Note:** For each new MCP server, you'll need to manually add a route in `Caddyfile`:
+```
+handle /myserver* {
+    reverse_proxy myserver-mcp:3000
+}
+```
+Then reload Caddy.
 
 ### Step 2: Configure GitHub Secrets (Per MCP Repo)
 
@@ -44,7 +59,9 @@ For each MCP server repo (e.g., siyuan-mcp-server):
 |-------------|-------|
 | `HETZNER_SSH_KEY` | Your SSH private key (entire content) |
 | `HETZNER_HOST` | Your server IP or hostname (e.g., `run8n.xyz`) |
-| `HETZNER_USER` | SSH username (usually `root`) |
+| `HETZNER_USER` | SSH username (recommended: `github-deploy`, or `root`) |
+
+**🔒 Security Recommendation:** Create a dedicated user `github-deploy` instead of using `root`. See [MCP-DEPLOYMENT.md](./MCP-DEPLOYMENT.md#ssh-key-setup-recommended-dedicated-user) for details.
 
 **Generate SSH Key (if needed):**
 ```bash
@@ -122,7 +139,7 @@ env:
 
 ### 4. Add to docker-compose-mcp.yml
 
-On Hetzner, edit `/mnt/volume_fra1_01/run8n-docker-caddy/docker-compose-mcp.yml`:
+On Hetzner, edit `/home/joo/run8n/docker-compose-mcp.yml`:
 
 ```yaml
   notion-mcp:

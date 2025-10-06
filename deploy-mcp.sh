@@ -9,8 +9,8 @@ set -e
 
 MCP_NAME=$1
 IMAGE_NAME=$2
-COMPOSE_FILE="/mnt/volume_fra1_01/run8n-docker-caddy/docker-compose-mcp.yml"
-CADDY_FILE="/mnt/volume_fra1_01/run8n-docker-caddy/caddy_config/Caddyfile"
+COMPOSE_FILE="/home/joo/run8n/docker-compose-mcp.yml"
+CADDY_FILE="/home/joo/run8n/caddy_config/Caddyfile"
 
 # Validation
 if [ -z "$MCP_NAME" ] || [ -z "$IMAGE_NAME" ]; then
@@ -37,11 +37,24 @@ fi
 
 # Step 3: Restart the MCP service
 echo "🔄 Restarting MCP service..."
-cd /mnt/volume_fra1_01/run8n-docker-caddy
+cd /home/joo/run8n
 docker-compose -f docker-compose-mcp.yml up -d "$SERVICE_NAME"
 
-# Step 4: Caddy auto-routes (no manual config needed)
-echo "✅ Caddy will auto-route: mcp.run8n.xyz/$MCP_NAME → $SERVICE_NAME:3000"
+# Step 4: Check if Caddyfile needs updating
+if ! grep -q "handle /$MCP_NAME\*" "$CADDY_FILE"; then
+    echo "⚠️  WARNING: Caddy route for /$MCP_NAME not found!"
+    echo ""
+    echo "Please add the following to $CADDY_FILE:"
+    echo ""
+    echo "    handle /$MCP_NAME* {"
+    echo "        reverse_proxy $SERVICE_NAME:3000"
+    echo "    }"
+    echo ""
+    echo "Then reload Caddy:"
+    echo "  docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
+else
+    echo "✅ Caddy route already configured for: mcp.run8n.xyz/$MCP_NAME"
+fi
 
 # Step 5: Health check
 echo "🏥 Waiting for service to be healthy..."
