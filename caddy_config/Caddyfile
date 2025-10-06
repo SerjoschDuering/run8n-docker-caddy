@@ -80,7 +80,7 @@ mcp.run8n.xyz {
 dashboard.run8n.xyz {
     # Require authentication for ALL routes
     basicauth {
-        admin JDJhJDE0JGJXd0c5Y3lGdC5oZ3RUTmRCSlRVaS5tUzFJeU5DQklLaDZLQnRhbGRtRHRRa3IzSE5NcE5l
+        admin $2a$14$VA488pOUSVuGi/Rq48s5tuRSmo28rZRXjKeAORdj4TELNJ54kPRMy
     }
 
     # Server Monitoring - Netdata
