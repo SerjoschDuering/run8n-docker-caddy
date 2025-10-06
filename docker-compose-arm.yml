@@ -66,6 +66,8 @@ services:
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=168  # Keep for 7 days with more storage
       - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
+      # Data Tables configuration (1GB max size)
+      - N8N_DATA_TABLES_MAX_SIZE_BYTES=1073741824
       # Performance optimizations for ARM
       - N8N_METRICS=true
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
