@@ -398,51 +398,6 @@ services:
   # OPTIONAL: Additional Services
   # ===========================================
 
-  # Monitoring with Prometheus (ARM compatible)
-  prometheus:
-    image: prom/prometheus:latest
-    platform: linux/arm64
-    restart: unless-stopped
-    expose:
-      - "9090"
-    volumes:
-      - /opt/run8n_data/prometheus:/prometheus
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--storage.tsdb.retention.time=30d'
-    deploy:
-      resources:
-        limits:
-          memory: 512M  # Prometheus is lightweight
-          cpus: '0.5'
-    networks:
-      - internal
-
-  # Grafana for visualization (ARM compatible)
-  grafana:
-    image: grafana/grafana:latest
-    platform: linux/arm64
-    restart: unless-stopped
-    expose:
-      - "3000"
-    volumes:
-      - /opt/run8n_data/grafana:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
-      - GF_INSTALL_PLUGINS=redis-datasource
-    deploy:
-      resources:
-        limits:
-          memory: 512M  # Grafana UI is lightweight
-          cpus: '0.5'
-    networks:
-      - internal
-      - public
 
   # ===========================================
   # DASHBOARD STACK - Homarr + Monitoring Tools
