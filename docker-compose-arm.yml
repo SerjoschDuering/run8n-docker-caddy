@@ -37,6 +37,7 @@ services:
       - caddy_data:/data
       - ${DATA_FOLDER}/caddy_config:/config
       - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
+      - /opt/run8n_data/static_sites:/srv
     deploy:
       resources:
         limits:
@@ -46,7 +47,7 @@ services:
       - public
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:next
     platform: linux/arm64
     restart: always
     expose:
