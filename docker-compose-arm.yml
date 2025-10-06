@@ -444,6 +444,99 @@ services:
       - internal
       - public
 
+  # ===========================================
+  # DASHBOARD STACK - Homarr + Monitoring Tools
+  # ===========================================
+
+  homarr:
+    image: ghcr.io/ajnart/homarr:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "7575"
+    volumes:
+      - /opt/run8n_data/homarr/configs:/app/data/configs
+      - /opt/run8n_data/homarr/icons:/app/public/icons
+      - /opt/run8n_data/homarr/data:/data
+    environment:
+      - AUTH_PROVIDER=credentials
+      - AUTH_SECRET_KEY=${HOMARR_SECRET_KEY}
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+          cpus: '0.4'
+    networks:
+      - public
+
+  netdata:
+    image: netdata/netdata:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "19999"
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /opt/run8n_data/netdata/config:/etc/netdata
+      - /opt/run8n_data/netdata/lib:/var/lib/netdata
+      - /opt/run8n_data/netdata/cache:/var/cache/netdata
+    environment:
+      - DOCKER_HOST=/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+          cpus: '0.3'
+    networks:
+      - public
+
+  dozzle:
+    image: amir20/dozzle:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOZZLE_LEVEL=info
+      - DOZZLE_TAILSIZE=300
+      - DOZZLE_FILTER=status=running
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+    networks:
+      - public
+
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - /opt/run8n_data:/srv
+      - /opt/run8n_data/filebrowser/database.db:/database.db
+      - /opt/run8n_data/filebrowser/settings.json:/config/settings.json
+    environment:
+      - FB_BASEURL=/
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+    networks:
+      - public
+
 networks:
   public:
     driver: bridge

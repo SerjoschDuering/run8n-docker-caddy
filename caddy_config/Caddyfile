@@ -70,3 +70,27 @@ mcp.run8n.xyz {
     }
 }
 
+# ===========================================
+# DASHBOARD STACK - Homarr + Monitoring Tools
+# ===========================================
+
+# Main Dashboard - Homarr
+dashboard.run8n.xyz {
+    reverse_proxy homarr:7575
+}
+
+# Server Monitoring - Netdata
+monitor.run8n.xyz {
+    reverse_proxy netdata:19999
+}
+
+# Container Logs - Dozzle
+logs.run8n.xyz {
+    reverse_proxy dozzle:8080
+}
+
+# File Browser
+files.run8n.xyz {
+    reverse_proxy filebrowser:80
+}
+
