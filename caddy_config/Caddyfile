@@ -85,6 +85,7 @@ dashboard.run8n.xyz {
 
     # Server Monitoring - Netdata
     handle /monitor* {
+        uri strip_prefix /monitor
         reverse_proxy netdata:19999
     }
 
