@@ -79,7 +79,7 @@ mcp.run8n.xyz {
 
 dashboard.run8n.xyz {
     # Require authentication for ALL routes
-    basicauth {
+    basic_auth * {
         admin $2a$14$VA488pOUSVuGi/Rq48s5tuRSmo28rZRXjKeAORdj4TELNJ54kPRMy
     }
 

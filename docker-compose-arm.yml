@@ -413,6 +413,8 @@ services:
     volumes:
       - /opt/run8n_data/homarr/appdata:/appdata
     environment:
+      - AUTH_PROVIDER=credentials
+      - SECRET_ENCRYPTION_KEY=${HOMARR_SECRET_KEY}
       - BASE_URL=https://dashboard.run8n.xyz
       # Auth disabled - protected by Caddy basic auth instead
     deploy:
@@ -446,7 +448,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 512M
           cpus: '0.3'
     networks:
       - dashboard_internal
@@ -477,7 +479,6 @@ services:
     image: filebrowser/filebrowser:latest
     platform: linux/arm64
     restart: unless-stopped
-    command: --noauth
     expose:
       - "80"
     volumes:
