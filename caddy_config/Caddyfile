@@ -51,7 +51,12 @@ mcp.run8n.xyz {
     # SiYuan MCP Server
     handle /siyuan* {
         uri strip_prefix /siyuan
-        reverse_proxy siyuan-mcp:3000
+        reverse_proxy siyuan-mcp:3000 {
+            header_up X-SiYuan-Token {header.X-SiYuan-Token}
+            header_up X-SiYuan-URL {header.X-SiYuan-URL}
+            header_up X-SiYuan-Credentials {header.X-SiYuan-Credentials}
+            flush_interval -1
+        }
     }
 
     # Add more MCP servers here as you deploy them
