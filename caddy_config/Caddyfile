@@ -50,6 +50,7 @@ sites.run8n.xyz {
 mcp.run8n.xyz {
     # SiYuan MCP Server
     handle /siyuan* {
+        uri strip_prefix /siyuan
         reverse_proxy siyuan-mcp:3000
     }
 
