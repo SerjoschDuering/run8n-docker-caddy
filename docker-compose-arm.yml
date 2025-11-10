@@ -73,6 +73,7 @@ services:
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
       - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
+      - N8N_INSECURE_DISABLE_WEBHOOK_IFRAME_SANDBOX=true
     volumes:
       - /opt/run8n_data/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
