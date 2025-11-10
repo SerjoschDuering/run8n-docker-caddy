@@ -49,7 +49,7 @@ services:
   n8n:
     build:
       context: .
-      dockerfile: Dockerfile.n8n-pdf
+      dockerfile: Dockerfile.n8n-light
     platform: linux/arm64
     restart: always
     expose:
@@ -76,7 +76,7 @@ services:
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
       - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
       - N8N_INSECURE_DISABLE_WEBHOOK_IFRAME_SANDBOX=true
-      - NODE_FUNCTION_ALLOW_EXTERNAL=pdf-lib,pdf-parse,sharp
+      - NODE_FUNCTION_ALLOW_EXTERNAL=pdf-lib,pdf-parse,sharp,pdfkit
     volumes:
       - /opt/run8n_data/n8n_data:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files

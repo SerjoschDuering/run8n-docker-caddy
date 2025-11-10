@@ -3,8 +3,8 @@ FROM docker.n8n.io/n8nio/n8n:next
 # Switch to root to install packages
 USER root
 
-# Install minimal system dependencies + ffmpeg
-RUN apk add --no-cache python3 py3-pip ffmpeg
+# Install minimal system dependencies + ffmpeg + PDF rasterizers and fonts
+RUN apk add --no-cache python3 py3-pip ffmpeg poppler-utils ghostscript imagemagick ttf-dejavu font-noto
 
 # Install essential Python packages (lightweight)
 RUN pip3 install --no-cache-dir \
@@ -36,6 +36,8 @@ RUN npm install -g \
     moment-timezone \
     sharp \
     pdf-lib \
+    pdf-parse \
+    pdfkit \
     js-yaml \
     joi \
     jsonwebtoken \
