@@ -181,7 +181,7 @@ services:
   # Exposed externally for CI/CD and local dev access
 
   run8n_db:
-    image: postgis/postgis:16-3.4-alpine  # PostgreSQL 16 + PostGIS 3.4
+    image: imresamu/postgis:16-3.5-bookworm  # PostgreSQL 16 + PostGIS 3.5 (ARM64 compatible)
     platform: linux/arm64
     restart: unless-stopped
     ports:
