@@ -157,7 +157,7 @@ services:
     depends_on:
       - redis
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6001/"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 -O- http://localhost:6001/ | grep -q OK"]
       interval: 30s
       timeout: 10s
       retries: 3
