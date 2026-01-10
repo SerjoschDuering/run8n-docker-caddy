@@ -134,17 +134,16 @@ services:
       SOKETI_DEFAULT_APP_MAX_CLIENT_EVENTS_PER_SECOND: "100"
       SOKETI_DEFAULT_APP_MAX_READ_REQUESTS_PER_SECOND: "100"
 
-      # Redis Adapter (for horizontal scaling)
-      SOKETI_ADAPTER_DRIVER: "redis"
-      SOKETI_ADAPTER_REDIS_HOST: "redis"
-      SOKETI_ADAPTER_REDIS_PORT: "6379"
-      SOKETI_ADAPTER_REDIS_PASSWORD: "${REDIS_PASSWORD:-changeme}"
+      # Adapter (local for single-server, redis for horizontal scaling)
+      SOKETI_ADAPTER_DRIVER: "local"
+      # To enable Redis adapter later, change to:
+      # SOKETI_ADAPTER_DRIVER: "redis"
+      # SOKETI_DB_REDIS_HOST: "redis"
+      # SOKETI_DB_REDIS_PORT: "6379"
+      # SOKETI_DB_REDIS_PASSWORD: "${REDIS_PASSWORD:-changeme}"
 
-      # Cache Driver
-      SOKETI_CACHE_DRIVER: "redis"
-      SOKETI_CACHE_REDIS_HOST: "redis"
-      SOKETI_CACHE_REDIS_PORT: "6379"
-      SOKETI_CACHE_REDIS_PASSWORD: "${REDIS_PASSWORD:-changeme}"
+      # Cache Driver (memory for now, redis available)
+      SOKETI_CACHE_DRIVER: "memory"
 
       # Metrics
       SOKETI_METRICS_ENABLED: "true"
